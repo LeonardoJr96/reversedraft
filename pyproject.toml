@@ -1,0 +1,17 @@
+[project]
+name = "reversedraft"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "LeonardoJr96",email = "leo70x7000@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi[standard] (>=0.136.3,<0.137.0)",
+    "requests (>=2.34.2,<3.0.0)"
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
