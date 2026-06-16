@@ -4,7 +4,31 @@
 
 ReverseDraft is an all-in-one platform designed to simplify the organization and management of competitive events. Whether you're running a sports league, esports tournament, fantasy competition, or community championship, ReverseDraft provides the tools needed to manage every stage of the competition lifecycle.
 
+ReverseDraft is a comprehensive platform for managing competitions, leagues, drafts, and auctions. This repository contains the application core, including the `fifa_data` module, which processes and exposes detailed data for players, clubs, and leagues based on the SoFIFA structure.
+
+## 🚀 Current Status: FIFA Data API
+
+The project currently features a robust REST API built with **Django** and **Django REST Framework**, focused on providing statistical football data to power draft and auction systems.
+
+### Key Features Implemented:
+*   **Complete SoFIFA Modeling:** Support for Players, Clubs, Leagues, Stadiums, and detailed technical attributes.
+*   **Advanced Filters (RQL):** Implementation of `dj-rql` for complex URL queries (e.g., filtering players by rating, age, and position in a single query).
+*   **Roster Versioning:** Support for multiple rosters and attribute history (*Player Prime*).
+*   **Trait and PlayStyle Management:** Complete mapping of special abilities and play styles.
+
 ## Features
+
+### FIFA Data & Analytics (`fifa_data` module)
+*   [x] Normalized data models for Players, Clubs, and Leagues.
+*   [x] REST API for data consumption.
+*   [x] Dynamic filter system via RQL.
+*   [x] Mapping of technical, physical, and mental attributes.
+*   [x] Bitmask support for Traits (official API style).
+
+### In Development
+*   [ ] Authentication System (JWT).
+*   [ ] Draft Logic (Snake & Reverse).
+*   [ ] Real-time Auction System.
 
 ### Team Management
 
@@ -84,15 +108,31 @@ ReverseDraft is an all-in-one platform designed to simplify the organization and
 
 ## Technology Stack
 
-Planned architecture:
-
-* Frontend: Next.js
-* Backend: NestJS
-* Database: PostgreSQL
-* Authentication: JWT / OAuth
-* ORM: Prisma
-* Real-Time Updates: WebSockets
+*   **Framework:** Django 6.0+
+*   **API:** Django REST Framework (DRF)
+*   **Query Language:** dj-rql (Resource Query Language)
+*   **Database:** SQLite (Development) / PostgreSQL (Production)
+*   **Real-Time Updates:** WebSockets (Planned)
 * Deployment: Docker
+
+## 🛠️ How to Run
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/seu-usuario/reversedraft.git
+    ```
+2.  **Install dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+3.  **Run migrations:**
+    ```bash
+    python manage.py migrate
+    ```
+4.  **Start the server:**
+    ```bash
+    python manage.py runserver
+    ```
 
 ## Roadmap
 
