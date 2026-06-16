@@ -1,0 +1,25 @@
+from django.contrib import admin
+from .models import FocusType, AccelerationType, Player, Club, Country, League, Gender, Position, LeagueType, PlayerPlayStyle, PlayerPlayStylePlus, PlayerPrime, PlayerRole, PlayerRoleAssignment, PlayerSpeciality, PlayerTeam, PlayStyle, PlayStylePlus, Speciality, Stadium, TraitType
+
+
+admin.site.register(Player)
+admin.site.register(Club)
+admin.site.register(League)
+admin.site.register(Country)
+admin.site.register(Position)
+admin.site.register(Gender)
+admin.site.register(LeagueType)
+admin.site.register(PlayerPlayStyle)
+admin.site.register(PlayerPlayStylePlus)
+admin.site.register(PlayerPrime)
+admin.site.register(PlayerRole)
+admin.site.register(PlayerRoleAssignment)
+admin.site.register(PlayerSpeciality)
+admin.site.register(PlayerTeam)
+admin.site.register(PlayStyle)
+admin.site.register(PlayStylePlus)
+admin.site.register(Speciality)
+admin.site.register(Stadium)
+admin.site.register(TraitType)
+admin.site.register(FocusType)
+admin.site.register(AccelerationType)
