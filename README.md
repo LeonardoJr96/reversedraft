@@ -134,6 +134,34 @@ The project currently features a robust REST API built with **Django** and **Dja
     python manage.py runserver
     ```
 
+## Import SoFIFA data manually
+
+The `fifa_data` app includes a manual importer that authenticates with JWT,
+uses `Authorization: Bearer <token>`, reads the SoFIFA-compatible endpoints,
+and saves data directly into the Django models/database.
+
+```bash
+set SOFIFA_USERNAME=your_user
+set SOFIFA_PASSWORD=your_password
+
+.\.venv\Scripts\python.exe manage.py import_sofifa ^
+  --base-url http://localhost:8000 ^
+  --data-prefix api/v1 ^
+  --roster 250016 ^
+  --game-version 25 ^
+  --player-id 158023 ^
+  --include-prime
+```
+
+Useful options:
+* `--token-path /api/v1/token/` and `--refresh-path /api/v1/token/refresh/`
+  match the JWT routes configured in `src.urls`.
+* `--data-prefix api/v1` makes data requests like `/api/v1/leagues`; omit it
+  if the source API exposes `/leagues`, `/teams/{roster}`, etc. at the root.
+* `--players-file players.txt` imports one player ID per line, or a JSON array
+  of IDs.
+* `--limit-clubs` and `--limit-players` are useful for small test imports.
+
 ## Roadmap
 
 ### Phase 1
