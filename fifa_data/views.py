@@ -1,15 +1,17 @@
 from django.shortcuts import render
 from dj_rql.drf import RQLFilterBackend
 from rest_framework import viewsets
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
+from django.conf import settings
 
 from .models import AccelerationType, Player, Club, League, Country, Position, Gender, LeagueType, PlayerPlayStyle, PlayerPlayStylePlus, PlayerPrime, PlayerRole, PlayerRoleAssignment, PlayerSpeciality, PlayerTeam, PlayStyle, PlayStylePlus, Speciality, Stadium, TraitType, FocusType
-
 from .serializers import PlayerSerializer, ClubSerializer, LeagueSerializer, CountrySerializer, PositionSerializer, GenderSerializer, LeagueTypeSerializer, PlayerPlayStyleSerializer, PlayerPlayStylePlusSerializer, PlayerPrimeSerializer, PlayerRoleSerializer, PlayerRoleAssignmentSerializer, PlayerSpecialitySerializer, PlayerTeamSerializer, PlayStyleSerializer, PlayStylePlusSerializer, SpecialitySerializer, StadiumSerializer, TraitTypeSerializer, FocusTypeSerializer, AccelerationTypeSerializer
-
 from .filters import PlayerFilter, ClubFilter, LeagueFilter, CountryFilter, PositionFilter, GenderFilter, LeagueTypeFilter, PlayerPlayStyleFilter, PlayerPlayStylePlusFilter, PlayerPrimeFilter, PlayerRoleFilter, PlayerRoleAssignmentFilter, PlayerSpecialityFilter, PlayerTeamFilter, PlayStyleFilter, PlayStylePlusFilter, SpecialityFilter, StadiumFilter, TraitTypeFilter, FocusTypeFilter, AccelerationTypeFilter
+from .services import import_players_bulk
 
 
-# Create your views here.
 class PlayerViewSet(viewsets.ModelViewSet):
     filter_backends = [RQLFilterBackend]
     rql_filter_class = PlayerFilter
@@ -105,7 +107,7 @@ class PlayStylePlusViewSet(viewsets.ModelViewSet):
     rql_filter_class = PlayStylePlusFilter
     queryset = PlayStylePlus.objects.all()
     serializer_class = PlayStylePlusSerializer
-    
+
 class SpecialityViewSet(viewsets.ModelViewSet):
     filter_backends = [RQLFilterBackend]
     rql_filter_class = SpecialityFilter
@@ -135,3 +137,14 @@ class AccelerationTypeViewSet(viewsets.ModelViewSet):
     rql_filter_class = AccelerationTypeFilter
     queryset = AccelerationType.objects.all()
     serializer_class = AccelerationTypeSerializer
+
+
+class PlayerBulkImportView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        if request.headers.get("X-Scraper-Key") != settings.SCRAPER_IMPORT_KEY:
+            return Response({"detail": "chave inválida"}, status=401)
+        rows = request.data.get("players", [])
+        players = import_players_bulk(rows)
+        return Response({"imported": len(players)}, status=201)

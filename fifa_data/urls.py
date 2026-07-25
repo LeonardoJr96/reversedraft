@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from fifa_data.views import PlayerViewSet, ClubViewSet, LeagueViewSet, CountryViewSet, PositionViewSet, GenderViewSet, LeagueTypeViewSet, PlayerPlayStyleViewSet, PlayerPlayStylePlusViewSet, PlayerPrimeViewSet, PlayerRoleViewSet, PlayerRoleAssignmentViewSet, PlayerSpecialityViewSet, PlayerTeamViewSet, PlayStyleViewSet, PlayStylePlusViewSet, SpecialityViewSet, StadiumViewSet, TraitTypeViewSet, FocusTypeViewSet, AccelerationTypeViewSet
+from .views import PlayerViewSet, ClubViewSet, LeagueViewSet, CountryViewSet, PositionViewSet, GenderViewSet, LeagueTypeViewSet, PlayerPlayStyleViewSet, PlayerPlayStylePlusViewSet, PlayerPrimeViewSet, PlayerRoleViewSet, PlayerRoleAssignmentViewSet, PlayerSpecialityViewSet, PlayerTeamViewSet, PlayStyleViewSet, PlayStylePlusViewSet, SpecialityViewSet, StadiumViewSet, TraitTypeViewSet, FocusTypeViewSet, AccelerationTypeViewSet, PlayerBulkImportView
 
 router = DefaultRouter()
 
@@ -27,5 +27,6 @@ router.register(r'focus_types', FocusTypeViewSet)
 router.register(r'acceleration_types', AccelerationTypeViewSet)
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path('api/v1/details', include(router.urls)),
+    path('import/players/', PlayerBulkImportView.as_view()),
 ]

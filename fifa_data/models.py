@@ -16,6 +16,8 @@ Convenções:
 """
 
 from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 
 # ============================================================
@@ -612,6 +614,7 @@ class Player(models.Model):
     latest_roster = models.CharField(max_length=50, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    photo_url = models.URLField(max_length=500, blank=True, null=True)
 
     class Meta:
         db_table = "players"
@@ -955,3 +958,16 @@ class PlayerPrime(models.Model):
 
     def __str__(self):
         return f"Prime of {self.player}"
+
+@receiver(post_save, sender=Player)
+def sync_product(sender, instance: Player, created, **kwargs):
+    from products.models import Product
+    Product.objects.update_or_create(
+        player=instance,
+        defaults={
+            "title": instance.common_name or f"{instance.first_name} {instance.last_name}",
+            "price": instance.price or 0,
+            "category": instance.positions_list[0] if instance.positions_list else "",
+            "quantity": 1,
+        },
+    )

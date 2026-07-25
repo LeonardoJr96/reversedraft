@@ -1,5 +1,5 @@
 """
-URL configuration for src project.
+URL configuration for core project.
 
 The `urlpatterns` list routes URLs to views. For more information please see:
     https://docs.djangoproject.com/en/6.0/topics/http/urls/
@@ -17,8 +17,20 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+
+
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/v1/', include('fifa_data.urls')),
-]
     
+    path('api/v1/auctions/', include('auction.urls')),
+    path('api/v1/products/', include('products.urls')),
+    
+    path('api/v1/users/', include('user.urls')),
+    path('api/v1/fifa/', include('fifa_data.urls')),
+
+    path('api/v1/team/', include('team.urls')),
+
+    path('login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('login/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+]
