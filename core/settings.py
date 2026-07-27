@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'user',
     'common',
     'team',
+    "payment",
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -147,9 +148,6 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
-
-PIX_GATEWAY = 'payment.gateways.fake.FakePixGateway'
-
 AUCTION_PAYMENT_DEADLINE_DAYS = 1
 AUCTION_PAYMENT_DEADLINE_DAYS = 1
 AUCTION_REOPEN_EXTENSION_DAYS = 7
@@ -164,11 +162,5 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
 }
-
-MERCADOPAGO_ACCESS_TOKEN = os.environ.get("MERCADOPAGO_ACCESS_TOKEN", "")
-MERCADOPAGO_NOTIFICATION_URL = os.environ.get(
-    "MERCADOPAGO_NOTIFICATION_URL",
-    "http://localhost:8000/api/v1/payments/webhook/",
-)
 
 SCRAPER_IMPORT_KEY = "troque-por-um-valor-secreto-de-verdade"

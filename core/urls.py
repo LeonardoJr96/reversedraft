@@ -30,6 +30,7 @@ urlpatterns = [
     path('api/v1/fifa/', include('fifa_data.urls')),
 
     path('api/v1/team/', include('team.urls')),
+    path('api/v1/payments/', include('payment.urls')),
 
     path('login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('login/refresh/', TokenRefreshView.as_view(), name='token_refresh'),

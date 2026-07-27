@@ -422,72 +422,53 @@ class Club(models.Model):
 
 class Player(models.Model):
     """
-    GET /player/{id}, /player/{id}/{roster}
+    Fonte: scraper sofifa.com (core/services/sofifa.py -> normalize.py -> ratings.py).
 
-    Notas importantes:
-    - birth_date: offset de dias desde data base FIFA (não DateField)
-    - trait1/trait2: bitmasks (BigIntegerField), decodificar via TraitType.bit_position
-    - position1..7: int com -1 para vazio; mapeados via Position.fifa_id
-      Mantidos flat para fidelidade à API + @property positions_list
-    - specialities: M2M via PlayerSpeciality
-    - play_style / play_style_plus: M2M via tabelas intermediárias
-    - role: M2M via PlayerRoleAssignment (inclui position por jogador)
-    - atk_work_rate / def_work_rate: inteiro ou null (0=Low,1=Med,2=High)
-    - icon_trait1 / icon_trait2: inteiros (significado interno do jogo, manter como int)
+    Notas:
+    - positions: lista de códigos de posição como string (ex: ["RB", "LB"]),
+      não IDs numéricos — o sofifa não expõe posição como FK.
+    - playstyles / roles: texto livre vindo do scraper, guardado como JSON.
+      Podem evoluir para M2M via PlayStyle/PlayerRole no futuro, se
+      quisermos normalizar por nome.
+    - pac/sho/pas/dri/def_rating/phy: calculados em ratings.py a partir dos
+      atributos brutos abaixo. None em goleiros.
     """
 
-    WORK_RATE_CHOICES = [
-        (0, "Low"),
-        (1, "Medium"),
-        (2, "High"),
-    ]
-
-    fifa_id = models.IntegerField(
-        unique=True, help_text="ID oficial do jogo FIFA/FC"
-    )
+    fifa_id = models.IntegerField(unique=True, help_text="sofifa_id — ID do jogador no sofifa.com")
     first_name = models.CharField(max_length=255, blank=True)
     last_name = models.CharField(max_length=255, blank=True)
     common_name = models.CharField(max_length=255, blank=True)
+
     country = models.ForeignKey(
         Country, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="players",
+        help_text="Não preenchido pelo scraper atual — reservado para fonte futura",
     )
     gender = models.ForeignKey(
         Gender, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="players",
+        help_text="Não preenchido pelo scraper atual — reservado para fonte futura",
     )
     acceleration_type = models.ForeignKey(
         AccelerationType, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="players",
     )
 
-    # Birth — offset int (ex: 152431) + campos auxiliares
-    birth_date = models.IntegerField(
-        null=True, blank=True,
-        help_text="Offset de dias desde data base FIFA",
-    )
-    birth_year = models.IntegerField(null=True, blank=True)
-    birth_month = models.IntegerField(null=True, blank=True)
-    birth_day = models.IntegerField(null=True, blank=True)
     age = models.IntegerField(null=True, blank=True)
 
     # Físico
-    height = models.IntegerField(null=True, blank=True)
-    weight = models.IntegerField(null=True, blank=True)
+    height = models.IntegerField(null=True, blank=True, help_text="cm")
+    weight = models.IntegerField(null=True, blank=True, help_text="kg")
 
-    # Posições (flat, fiel à API; -1 = vazio)
-    position1 = models.IntegerField(null=True, blank=True)
-    position2 = models.IntegerField(null=True, blank=True, default=-1)
-    position3 = models.IntegerField(null=True, blank=True, default=-1)
-    position4 = models.IntegerField(null=True, blank=True, default=-1)
-    position5 = models.IntegerField(null=True, blank=True, default=-1)
-    position6 = models.IntegerField(null=True, blank=True, default=-1)
-    position7 = models.IntegerField(null=True, blank=True, default=-1)
+    # Posições — texto livre, fiel ao que o sofifa entrega
+    positions = models.JSONField(default=list, blank=True, help_text="Ex: ['RB', 'LB']")
+    best_position = models.CharField(max_length=10, blank=True, null=True)
 
     # Pé e qualificações
     foot = models.IntegerField(null=True, blank=True, help_text="1=Right, 2=Left")
-    weak_foot = models.IntegerField(null=True, blank=True, help_text="Estrelas 1-5 (valor 0-4 na API)")
-    skill_moves = models.IntegerField(null=True, blank=True, help_text="Estrelas 1-5 (valor 0-4 na API)")
+    weak_foot = models.IntegerField(null=True, blank=True, help_text="Estrelas 1-5")
+    skill_moves = models.IntegerField(null=True, blank=True, help_text="Estrelas 1-5")
+    international_reputation = models.IntegerField(null=True, blank=True, help_text="Estrelas 1-5")
 
     # Atributos técnicos
     crossing = models.IntegerField(null=True, blank=True)
@@ -519,9 +500,10 @@ class Player(models.Model):
     positioning = models.IntegerField(null=True, blank=True)
     vision = models.IntegerField(null=True, blank=True)
     penalties = models.IntegerField(null=True, blank=True)
-    marking = models.IntegerField(null=True, blank=True)
+    marking = models.IntegerField(null=True, blank=True, help_text="Defensive awareness")
     standing_tackle = models.IntegerField(null=True, blank=True)
     sliding_tackle = models.IntegerField(null=True, blank=True)
+    composure = models.IntegerField(null=True, blank=True)
 
     # Goleiro
     gk_diving = models.IntegerField(null=True, blank=True)
@@ -530,91 +512,36 @@ class Player(models.Model):
     gk_positioning = models.IntegerField(null=True, blank=True)
     gk_reflexes = models.IntegerField(null=True, blank=True)
 
-    composure = models.IntegerField(null=True, blank=True)
-
-    # Aparência
-    head_class_code = models.IntegerField(null=True, blank=True)
-    body_type_code = models.IntegerField(null=True, blank=True)
-
     # Ratings gerais
     overall_rating = models.IntegerField(null=True, blank=True)
     potential = models.IntegerField(null=True, blank=True)
-    growth = models.IntegerField(null=True, blank=True)
-    international_rep = models.IntegerField(null=True, blank=True)
-
-    # Work rates — inteiro (0=Low, 1=Med, 2=High) ou null
-    atk_work_rate = models.IntegerField(
-        null=True, blank=True, choices=WORK_RATE_CHOICES
-    )
-    def_work_rate = models.IntegerField(
-        null=True, blank=True, choices=WORK_RATE_CHOICES
-    )
-
-    # Traits: bitmasks (não FKs!)
-    # Use TraitType.bit_position para decodificar
-    trait1 = models.BigIntegerField(
-        null=True, blank=True,
-        help_text="Bitmask. Decodificar via TraitType.bit_position",
-    )
-    trait2 = models.BigIntegerField(
-        null=True, blank=True,
-        help_text="Bitmask. Decodificar via TraitType.bit_position",
-    )
-
-    # Icon traits (significado interno do jogo)
-    icon_trait1 = models.BigIntegerField(null=True, blank=True)
-    icon_trait2 = models.BigIntegerField(null=True, blank=True)
 
     # Finanças
     price = models.BigIntegerField(null=True, blank=True)
     wage = models.BigIntegerField(null=True, blank=True)
-    buyout = models.BigIntegerField(null=True, blank=True)
 
-    # Ratings agregados (pac/sho/pas/dri/def/phy)
+    # Ratings agregados (calculados em ratings.py)
     pac = models.IntegerField(null=True, blank=True)
     sho = models.IntegerField(null=True, blank=True)
     pas = models.IntegerField(null=True, blank=True)
     dri = models.IntegerField(null=True, blank=True)
     def_rating = models.IntegerField(
         null=True, blank=True, db_column="def_rating",
-        help_text="Campo 'def' na API (renomeado para evitar conflito com keyword Python)",
+        help_text="Campo 'def' (renomeado para evitar conflito com keyword Python)",
     )
     phy = models.IntegerField(null=True, blank=True)
 
-    # M2M (via tabelas intermediárias abaixo)
-    specialities = models.ManyToManyField(
-        Speciality,
-        through="PlayerSpeciality",
-        related_name="players",
-        blank=True,
-    )
-    play_styles = models.ManyToManyField(
-        PlayStyle,
-        through="PlayerPlayStyle",
-        related_name="players",
-        blank=True,
-    )
-    play_styles_plus = models.ManyToManyField(
-        PlayStylePlus,
-        through="PlayerPlayStylePlus",
-        related_name="players",
-        blank=True,
-    )
-    roles = models.ManyToManyField(
-        PlayerRole,
-        through="PlayerRoleAssignment",
-        related_name="players",
-        blank=True,
+    # Texto livre vindo do scraper
+    playstyles = models.JSONField(default=list, blank=True, help_text='Ex: ["Trivela", "Quick Step"]')
+    player_roles = models.JSONField(
+        default=list, blank=True,
+        help_text='Ex: [{"role": "Wingback +", "position": "RB", "focuses": ["Balanced", "Support"]}]',
     )
 
-    # Versioning
-    roster = models.CharField(max_length=50, blank=True, null=True)
-    version = models.CharField(max_length=10, blank=True, null=True)
-    export = models.CharField(max_length=50, blank=True, null=True)
-    latest_roster = models.CharField(max_length=50, blank=True, null=True)
+    photo_url = models.URLField(max_length=500, blank=True, null=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    photo_url = models.URLField(max_length=500, blank=True, null=True)
 
     class Meta:
         db_table = "players"
@@ -623,31 +550,11 @@ class Player(models.Model):
         return self.common_name or f"{self.first_name} {self.last_name}".strip()
 
     @property
-    def positions_list(self) -> list[int]:
-        """Retorna lista de fifa_ids de posições válidas (exclui -1)."""
-        raw = [
-            self.position1, self.position2, self.position3,
-            self.position4, self.position5, self.position6, self.position7,
-        ]
-        return [p for p in raw if p is not None and p >= 0]
+    def positions_list(self) -> list[str]:
+        """Mantido por compatibilidade com quem já usa essa property
+        (ex: signal que cria o Product) — agora retorna os códigos direto."""
+        return self.positions or []
 
-    @property
-    def decoded_traits(self) -> list[str]:
-        """
-        Decodifica trait1 e trait2 (bitmasks) para lista de nomes de traits.
-        Requer que TraitType esteja populado com bit_position correto.
-        """
-        result = []
-        combined = (self.trait1 or 0) | ((self.trait2 or 0) << 32)
-        for trait in TraitType.objects.all():
-            if combined & (1 << trait.bit_position):
-                result.append(trait.name)
-        return result
-
-
-# ============================================================
-# PLAYER TEAM ASSIGNMENT (relação jogador ↔ clube, por roster)
-# ============================================================
 
 class PlayerTeam(models.Model):
     """
