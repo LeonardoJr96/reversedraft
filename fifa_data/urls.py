@@ -27,6 +27,6 @@ router.register(r'focus_types', FocusTypeViewSet)
 router.register(r'acceleration_types', AccelerationTypeViewSet)
 
 urlpatterns = [
-    path('api/v1/details/', include(router.urls)),
+    path('', include(router.urls)),
     path('import/players/', PlayerBulkImportView.as_view()),
 ]

@@ -2,9 +2,17 @@ from rest_framework import serializers
 from .models import Player, Club, League, Country, Position, Gender, LeagueType, PlayerPlayStyle, PlayerPlayStylePlus, PlayerPrime, PlayerRole, PlayerRoleAssignment, PlayerSpeciality, PlayerTeam, PlayStyle, PlayStylePlus, Speciality, Stadium, TraitType, FocusType, AccelerationType
 
 class PlayerSerializer(serializers.ModelSerializer):
+    # Campo pronto pra usar direto no <img src>: prioriza a versão já
+    # baixada/embutida (photo_base64) e cai pro link externo (photo_url)
+    # se ainda não tiver sido processada pelo backfill_player_photos.
+    photo_data_uri = serializers.SerializerMethodField()
+
     class Meta:
         model = Player
         fields = '__all__'
+
+    def get_photo_data_uri(self, obj):
+        return obj.photo_base64 or obj.photo_url
 
 class ClubSerializer(serializers.ModelSerializer):
     class Meta:

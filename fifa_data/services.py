@@ -1,6 +1,38 @@
+import base64
+import mimetypes
+
+import requests
 from decimal import Decimal
 from django.db import transaction
 from .models import Player, AccelerationType
+
+
+def fetch_photo_as_base64(url: str | None, timeout: int = 10) -> str | None:
+    """Baixa a foto do jogador (CDN sofifa) e devolve como data URI base64.
+
+    Usado para o front não depender de hotlink direto no CDN externo
+    (bloqueio por Referer, CORS, ou simplesmente indisponibilidade do
+    domínio de terceiros): a imagem fica embutida na resposta da API.
+    """
+    if not url:
+        return None
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; ReverseDraftBot/1.0)",
+            "Referer": "https://sofifa.com/",
+        }
+        response = requests.get(url, headers=headers, timeout=timeout)
+        response.raise_for_status()
+    except requests.RequestException:
+        return None
+
+    content_type = (
+        response.headers.get("Content-Type")
+        or mimetypes.guess_type(url)[0]
+        or "image/png"
+    )
+    encoded = base64.b64encode(response.content).decode("ascii")
+    return f"data:{content_type};base64,{encoded}"
 
 def upsert_player(data: dict) -> Player:
     accel = None

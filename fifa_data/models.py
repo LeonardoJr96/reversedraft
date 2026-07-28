@@ -539,6 +539,14 @@ class Player(models.Model):
     )
 
     photo_url = models.URLField(max_length=500, blank=True, null=True)
+    photo_base64 = models.TextField(
+        blank=True, null=True,
+        help_text=(
+            "Foto do jogador já baixada e codificada como data URI base64 "
+            "(ex: 'data:image/png;base64,...'). Evita depender do CDN externo "
+            "do sofifa direto no <img src> do front (hotlink/CORS/expiração)."
+        ),
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

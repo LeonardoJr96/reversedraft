@@ -23,11 +23,16 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 urlpatterns = [
     path('admin/', admin.site.urls),
     
-    path('api/v1/auctions/', include('auction.urls')),
-    path('api/v1/products/', include('products.urls')),
+    # OBS: os routers de auction/products já registram seus próprios
+    # prefixos ('auctions', 'bids', 'products'), então aqui usamos só
+    # 'api/v1/' — senão a URL final duplica (ex: /api/v1/products/products/)
+    # e o front, ao chamar /api/v1/products/, recebe o api-root do DRF
+    # em vez da lista real de produtos.
+    path('api/v1/', include('auction.urls')),
+    path('api/v1/', include('products.urls')),
     
     path('api/v1/users/', include('user.urls')),
-    path('api/v1/fifa/', include('fifa_data.urls')),
+    path('api/v1/details/', include('fifa_data.urls')),
 
     path('api/v1/team/', include('team.urls')),
     path('api/v1/payments/', include('payment.urls')),
