@@ -8,7 +8,7 @@ class PricingMode(models.TextChoices):
 class Auction(models.Model):
     product = models.ForeignKey('products.Product', on_delete=models.CASCADE)
     pricing_mode = models.CharField(max_length=20, choices=PricingMode.choices, default=PricingMode.PLAYER_VALUE)
-    starting_price = models.DecimalField(max_digits=12, decimal_places=2)
+    starting_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     min_increment = models.DecimalField(max_digits=12, decimal_places=2, default=1)
     number_of_bids = models.IntegerField(default=0)
     winner = models.ForeignKey('user.User', on_delete=models.SET_NULL, null=True, blank=True)

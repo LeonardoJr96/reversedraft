@@ -13,11 +13,11 @@ from django.core.management.base import BaseCommand
 from django.db.models import Q
 
 from fifa_data.models import Player
-from fifa_data.services import fetch_photo_as_base64
+from fifa_data.services import fetch_photo_as_file
 
 
 class Command(BaseCommand):
-    help = "Baixa fotos dos jogadores (photo_url) e preenche photo_base64."
+    help = "Baixa fotos dos jogadores (photo_url) e salva no campo photo do modelo Player."
 
     def add_arguments(self, parser):
         parser.add_argument("--limit", type=int, default=None, help="Limitar quantidade de jogadores processados")
@@ -27,7 +27,7 @@ class Command(BaseCommand):
         qs = Player.objects.exclude(Q(photo_url__isnull=True) | Q(photo_url__exact=""))
 
         if not options["force"]:
-            qs = qs.filter(Q(photo_base64__isnull=True) | Q(photo_base64__exact=""))
+            qs = qs.filter(Q(photo__isnull=True) | Q(photo__exact=""))
 
         if options["limit"]:
             qs = qs[: options["limit"]]
@@ -37,10 +37,12 @@ class Command(BaseCommand):
 
         ok = fail = 0
         for i, player in enumerate(qs.iterator(), start=1):
-            encoded = fetch_photo_as_base64(player.photo_url)
-            if encoded:
-                player.photo_base64 = encoded
-                player.save(update_fields=["photo_base64"])
+            photo_file = fetch_photo_as_file(player.photo_url, player.fifa_id)
+            if photo_file:
+                if player.photo:
+                    player.photo.delete(save=False)
+                player.photo.save(photo_file.name, photo_file, save=False)
+                player.save(update_fields=["photo"])
                 ok += 1
             else:
                 fail += 1

@@ -12,6 +12,7 @@ class User(AbstractUser):
     post_code = models.CharField(max_length=45)
     country = models.CharField(max_length=45)
     lance_credits = models.IntegerField(default=0)
+    balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     birth_date = models.DateField()
     terms_accepted_at = models.DateTimeField(null=True, blank=True)
     self_excluded_until = models.DateTimeField(null=True, blank=True)

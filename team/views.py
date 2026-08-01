@@ -15,14 +15,24 @@ class MyTeamView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        team = get_or_create_team(request.user)
+        campaign_id = request.query_params.get('campaign_id')
+        campaign = None
+        if campaign_id:
+            from campaigns.models import Campaign
+            campaign = Campaign.objects.filter(pk=campaign_id).first()
+        team = get_or_create_team(request.user, campaign)
         return Response(TeamSerializer(team).data)
 
     def patch(self, request):
-        """Body: {"formation": "4-4-2"}"""
+        """Body: {"formation": "4-4-2", "campaign_id": 1}"""
         formation = request.data.get("formation")
+        campaign_id = request.data.get("campaign_id")
+        campaign = None
+        if campaign_id:
+            from campaigns.models import Campaign
+            campaign = Campaign.objects.filter(pk=campaign_id).first()
         try:
-            team = set_formation(request.user, formation)
+            team = set_formation(request.user, formation, campaign)
         except ValidationError as e:
             return Response({"detail": str(e)}, status=400)
         return Response(TeamSerializer(team).data)
@@ -40,9 +50,14 @@ class TacticSlotView(APIView):
     permission_classes = [IsAuthenticated]
 
     def put(self, request, slot_code):
-        """Body: {"player_id": 123}  (ou {"player_id": null} pra esvaziar a posição)"""
+        """Body: {"player_id": 123, "campaign_id": 1}  (ou {"player_id": null} pra esvaziar a posição)"""
+        campaign_id = request.data.get("campaign_id")
+        campaign = None
+        if campaign_id:
+            from campaigns.models import Campaign
+            campaign = Campaign.objects.filter(pk=campaign_id).first()
         try:
-            slot = set_tactic_slot(request.user, slot_code, request.data.get("player_id"))
+            slot = set_tactic_slot(request.user, slot_code, request.data.get("player_id"), campaign)
         except ValidationError as e:
             return Response({"detail": str(e)}, status=400)
         from .serializers import TacticSlotSerializer

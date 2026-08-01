@@ -13,16 +13,18 @@ class PlayerSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_photo_data_uri(self, obj):
-        if not obj.photo:
-            return obj.photo_url
+        if getattr(obj, "photo", None):
+            obj.photo.open("rb")
+            try:
+                encoded = base64.b64encode(obj.photo.read()).decode("ascii")
+            finally:
+                obj.photo.close()
+            return f"data:image/png;base64,{encoded}"
 
-        obj.photo.open("rb")
-        try:
-            encoded = base64.b64encode(obj.photo.read()).decode("ascii")
-        finally:
-            obj.photo.close()
+        if getattr(obj, "photo_base64", None):
+            return f"data:image/png;base64,{obj.photo_base64}"
 
-        return f"data:image/png;base64,{encoded}"
+        return obj.photo_url or ""
 
 class ClubSerializer(serializers.ModelSerializer):
     class Meta:

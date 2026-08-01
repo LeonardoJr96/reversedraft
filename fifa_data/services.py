@@ -1,9 +1,12 @@
 import base64
 import binascii
 from decimal import Decimal
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 from django.core.files.base import ContentFile
 from django.db import transaction
+
 from .models import Player, AccelerationType
 
 
@@ -18,6 +21,34 @@ def _decode_photo(photo_base64: str | None, sofifa_id) -> ContentFile | None:
     except (binascii.Error, ValueError):
         return None
     return ContentFile(raw, name=f"{sofifa_id}.png")
+
+
+def fetch_photo_as_file(photo_url: str | None, sofifa_id: int | str | None = None) -> ContentFile | None:
+    """Baixa uma foto a partir de uma URL e retorna um ContentFile pronto para salvar."""
+    if not photo_url:
+        return None
+
+    try:
+        request = Request(photo_url, headers={"User-Agent": "Mozilla/5.0"})
+        with urlopen(request, timeout=10) as response:
+            raw = response.read()
+    except (HTTPError, URLError, TimeoutError, ValueError):
+        return None
+
+    if not raw:
+        return None
+
+    filename = f"{sofifa_id or 'player'}.png"
+    return ContentFile(raw, name=filename)
+
+
+def fetch_photo_as_base64(photo_url: str | None, sofifa_id: int | str | None = None) -> str | None:
+    """Compatibilidade com comandos antigos que esperam uma string em base64."""
+    photo_file = fetch_photo_as_file(photo_url, sofifa_id)
+    if photo_file is None:
+        return None
+
+    return base64.b64encode(photo_file.read()).decode("ascii")
 
 
 def upsert_player(data: dict) -> Player:

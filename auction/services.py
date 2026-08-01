@@ -1,7 +1,6 @@
 # auction/services.py
 from datetime import timedelta
 
-from datetime import timedelta
 from django.core.exceptions import ValidationError
 from django.conf import settings
 from django.utils import timezone
@@ -104,6 +103,17 @@ def place_bid(user, auction: Auction, price):
     return bid
 
 
+def get_bid_status(bid):
+    """Retorna o status legível do lance para a tela de perfil."""
+    auction = bid.auction
+    if auction.status == Status.OPEN:
+        return 'em_andamento'
+    # Leilão já encerrado
+    if auction.winner_id == bid.user_id:
+        return 'vencedor'
+    return auction.get_status_display()
+
+
 def get_winning_bid(auction: Auction):
     """
     Vence quem deu o maior lance. Se o maior preço estiver empatado
@@ -180,8 +190,8 @@ def expire_unpaid_auctions():
     de pagamento venceu. A partir daí, fica a critério do admin:
     deixar como está ou reabrir (reopen_auction).
     """
-    winner = Auction.objects.filter(
+    qs = Auction.objects.filter(
         status=Status.PENDING,
         payment_deadline__lt=timezone.now(),
     )
-    winner.update(status=Status.EXPIRED)
+    qs.update(status=Status.EXPIRED)

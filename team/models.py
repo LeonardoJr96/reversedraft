@@ -28,10 +28,23 @@ class FormationSlot(models.Model):
 
 
 class Team(models.Model):
-    owner = models.OneToOneField("user.User", on_delete=models.CASCADE, related_name="team")
+    owner = models.ForeignKey("user.User", on_delete=models.CASCADE, related_name="teams")
+    campaign = models.ForeignKey("campaigns.Campaign", on_delete=models.CASCADE, related_name="teams", null=True, blank=True)
     name = models.CharField(max_length=100, blank=True)
     formation = models.CharField(max_length=10, choices=FORMATION_CHOICES, default="4-3-3")
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("owner", "campaign")
+
+
+class RosterEntry(models.Model):
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name="roster_entries")
+    player = models.ForeignKey("fifa_data.Player", on_delete=models.CASCADE, related_name="roster_entries")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("team", "player")
 
 
 class TacticSlot(models.Model):

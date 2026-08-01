@@ -6,23 +6,28 @@ from common.models import Status
 from .models import Team, TacticSlot, FormationSlot
 
 
-def get_roster(user) -> list:
-    """Jogadores que o usuário efetivamente ganhou e pagou."""
-    auctions = Auction.objects.filter(winner=user, status=Status.PAID).select_related("product__player")
-    return [a.product.player for a in auctions if a.product.player_id]
-
-
-def get_or_create_team(user) -> Team:
-    team, _ = Team.objects.get_or_create(owner=user)
+def get_or_create_team(user, campaign=None) -> Team:
+    team, _ = Team.objects.get_or_create(owner=user, campaign=campaign)
     return team
 
 
-def set_formation(user, formation: str) -> Team:
+def get_roster(user, campaign=None) -> list:
+    """Retorna os jogadores presentes no `RosterEntry` do time do usuário.
+
+    Se `campaign` for fornecida, retorna o elenco daquele time na campanha;
+    caso contrário, retorna o time global (campaign=None).
+    """
+    team = get_or_create_team(user, campaign)
+    entries = team.roster_entries.select_related('player').all()
+    return [e.player for e in entries]
+
+
+def set_formation(user, formation: str, campaign=None) -> Team:
     valid_formations = set(FormationSlot.objects.values_list("formation", flat=True))
     if formation not in valid_formations:
         raise ValidationError(f"Formação '{formation}' não existe.")
 
-    team = get_or_create_team(user)
+    team = get_or_create_team(user, campaign)
     with transaction.atomic():
         team.formation = formation
         team.save()
@@ -31,15 +36,15 @@ def set_formation(user, formation: str) -> Team:
     return team
 
 
-def set_tactic_slot(user, slot_code: str, player_id: int | None) -> TacticSlot:
-    team = get_or_create_team(user)
+def set_tactic_slot(user, slot_code: str, player_id: int | None, campaign=None) -> TacticSlot:
+    team = get_or_create_team(user, campaign)
 
     slot_exists = FormationSlot.objects.filter(formation=team.formation, slot_code=slot_code).exists()
     if not slot_exists:
         raise ValidationError(f"Posição '{slot_code}' não existe na formação {team.formation}.")
 
     if player_id is not None:
-        roster_ids = {p.id for p in get_roster(user)}
+        roster_ids = {p.id for p in get_roster(user, campaign)}
         if player_id not in roster_ids:
             raise ValidationError("Você só pode escalar jogadores que ganhou em leilão.")
 
