@@ -1,38 +1,24 @@
 import base64
-import mimetypes
-
-import requests
+import binascii
 from decimal import Decimal
+
+from django.core.files.base import ContentFile
 from django.db import transaction
 from .models import Player, AccelerationType
 
 
-def fetch_photo_as_base64(url: str | None, timeout: int = 10) -> str | None:
-    """Baixa a foto do jogador (CDN sofifa) e devolve como data URI base64.
-
-    Usado para o front não depender de hotlink direto no CDN externo
-    (bloqueio por Referer, CORS, ou simplesmente indisponibilidade do
-    domínio de terceiros): a imagem fica embutida na resposta da API.
-    """
-    if not url:
+def _decode_photo(photo_base64: str | None, sofifa_id) -> ContentFile | None:
+    """Decodifica a foto em base64 mandada pelo scraper.
+    Retorna None (sem quebrar o import) se o campo não vier ou vier corrompido —
+    o jogador é salvo normalmente, só sem foto nessa rodada."""
+    if not photo_base64:
         return None
     try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (compatible; ReverseDraftBot/1.0)",
-            "Referer": "https://sofifa.com/",
-        }
-        response = requests.get(url, headers=headers, timeout=timeout)
-        response.raise_for_status()
-    except requests.RequestException:
+        raw = base64.b64decode(photo_base64, validate=True)
+    except (binascii.Error, ValueError):
         return None
+    return ContentFile(raw, name=f"{sofifa_id}.png")
 
-    content_type = (
-        response.headers.get("Content-Type")
-        or mimetypes.guess_type(url)[0]
-        or "image/png"
-    )
-    encoded = base64.b64encode(response.content).decode("ascii")
-    return f"data:{content_type};base64,{encoded}"
 
 def upsert_player(data: dict) -> Player:
     accel = None
@@ -95,6 +81,10 @@ def upsert_player(data: dict) -> Player:
         "gk_positioning": data.get("gk_positioning"),
         "gk_reflexes": data.get("gk_reflexes"),
     }
+
+    photo_file = _decode_photo(data.get("photo_base64"), data["sofifa_id"])
+    if photo_file is not None:
+        defaults["photo"] = photo_file
 
     player, _created = Player.objects.update_or_create(
         fifa_id=data["sofifa_id"], defaults=defaults

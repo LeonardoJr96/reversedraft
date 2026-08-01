@@ -15,6 +15,9 @@ Convenções:
   - Relações M2M modeladas com tabelas intermediárias explícitas
 """
 
+import os
+
+from django.core.files.base import ContentFile
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -539,13 +542,9 @@ class Player(models.Model):
     )
 
     photo_url = models.URLField(max_length=500, blank=True, null=True)
-    photo_base64 = models.TextField(
-        blank=True, null=True,
-        help_text=(
-            "Foto do jogador já baixada e codificada como data URI base64 "
-            "(ex: 'data:image/png;base64,...'). Evita depender do CDN externo "
-            "do sofifa direto no <img src> do front (hotlink/CORS/expiração)."
-        ),
+    photo = models.ImageField(
+        upload_to="player_photos/", blank=True, null=True,
+        help_text="Binário da foto baixado pelo scraper a partir de photo_url.",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -876,8 +875,9 @@ class PlayerPrime(models.Model):
 
 @receiver(post_save, sender=Player)
 def sync_product(sender, instance: Player, created, **kwargs):
-    from products.models import Product
-    Product.objects.update_or_create(
+    from products.models import Product, ProductImage
+
+    product, _ = Product.objects.update_or_create(
         player=instance,
         defaults={
             "title": instance.common_name or f"{instance.first_name} {instance.last_name}",
@@ -886,3 +886,20 @@ def sync_product(sender, instance: Player, created, **kwargs):
             "quantity": 1,
         },
     )
+
+    # Replica a foto do jogador como capa do produto no catálogo.
+    # Copiamos os bytes em vez de reaproveitar o mesmo arquivo do Player
+    # pra manter product_images/ independente de player_photos/.
+    if instance.photo:
+        cover, _ = ProductImage.objects.get_or_create(
+            product=product, is_cover=True, defaults={"order": 0},
+        )
+        instance.photo.open("rb")
+        try:
+            cover.image.save(
+                os.path.basename(instance.photo.name),
+                ContentFile(instance.photo.read()),
+                save=True,
+            )
+        finally:
+            instance.photo.close()

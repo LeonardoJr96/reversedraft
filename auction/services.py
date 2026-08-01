@@ -43,9 +43,11 @@ def get_current_price(auction: Auction):
 
 def place_bid(user, auction: Auction, price):
     """
-    Registra um novo lance no leilão.
-    Lances duplicados são permitidos (a regra de "único"
-    só é aplicada depois, no fechamento do leilão).
+    Registra um novo lance no leilão. Cada lance consome 1 crédito
+    (user.lance_credits) — sem crédito, não é possível apostar.
+    Lances duplicados (mesmo valor) do mesmo usuário já são recusados
+    pela regra de incremento mínimo abaixo, então não precisam de
+    checagem extra aqui.
     """
     if user.self_excluded_until and user.self_excluded_until > timezone.now():
         raise ValidationError(
@@ -54,6 +56,9 @@ def place_bid(user, auction: Auction, price):
 
     with transaction.atomic():
         auction = Auction.objects.select_for_update().get(pk=auction.pk)
+        # Trava a linha do usuário também: evita que duas requisições
+        # concorrentes leiam o mesmo saldo de créditos e as duas passem.
+        locked_user = User.objects.select_for_update().get(pk=user.pk)
 
         if auction.status != Status.OPEN:
             raise ValidationError("Este leilão não está aberto para lances.")
@@ -73,12 +78,18 @@ def place_bid(user, auction: Auction, price):
             if price < minimo_seguinte:
                 raise ValidationError(f"Seu lance deve ser de pelo menos {minimo_seguinte}.")
 
+        if locked_user.lance_credits <= 0:
+            raise ValidationError("Você não tem créditos de lance suficientes.")
+
         bid = Bid.objects.create(
-            user=user,
+            user=locked_user,
             auction=auction,
             bid_time=agora,
             price=price,
         )
+
+        locked_user.lance_credits -= 1
+        locked_user.save(update_fields=['lance_credits'])
 
         auction.number_of_bids += 1
 
@@ -94,8 +105,23 @@ def place_bid(user, auction: Auction, price):
 
 
 def get_winning_bid(auction: Auction):
-    """Vence quem deu o maior lance (leilão ascendente clássico)."""
-    return Bid.objects.filter(auction=auction).order_by('-price', 'bid_time').first()
+    """
+    Vence quem deu o maior lance. Se o maior preço estiver empatado
+    entre DOIS USUÁRIOS DIFERENTES, não há vencedor único (retorna None).
+    Empate do mesmo usuário consigo mesmo não conta como ambíguo.
+    """
+    bids = list(Bid.objects.filter(auction=auction).order_by('-price', 'bid_time'))
+    if not bids:
+        return None
+
+    top_price = bids[0].price
+    empatados = [b for b in bids if b.price == top_price]
+    usuarios_distintos = {b.user_id for b in empatados}
+
+    if len(usuarios_distintos) > 1:
+        return None
+
+    return empatados[0]
 
 
 def close_auction(auction: Auction):
@@ -135,6 +161,9 @@ def reopen_auction(auction: Auction):
 
     novo_auction = Auction.objects.create(
         product=auction.product,
+        pricing_mode=auction.pricing_mode,
+        starting_price=auction.starting_price,
+        min_increment=auction.min_increment,
         time_starting=timezone.now(),
         time_ending=timezone.now() + timedelta(days=settings.AUCTION_REOPEN_EXTENSION_DAYS),
         status=Status.OPEN,

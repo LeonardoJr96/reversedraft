@@ -149,8 +149,10 @@ USE_TZ = True
 STATIC_URL = 'static/'
 
 AUCTION_PAYMENT_DEADLINE_DAYS = 1
-AUCTION_PAYMENT_DEADLINE_DAYS = 1
 AUCTION_REOPEN_EXTENSION_DAYS = 7
+# Anti-sniping: cada lance garante pelo menos N segundos de janela
+# restante no leilão, a partir do momento do lance (nunca encurta).
+AUCTION_BID_EXTENSION_SECONDS = 30
 RESPONSIBLE_GAMBLING_DEPOSIT_LIMIT = 500.00   
 RESPONSIBLE_GAMBLING_LOSS_LIMIT = 300.00  
 

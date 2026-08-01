@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Auction, Bid
+from products.models import Product
+from .models import Auction, Bid, PricingMode
 from .services import get_current_price
 
 class AuctionSerializer(serializers.ModelSerializer):
@@ -12,6 +13,27 @@ class AuctionSerializer(serializers.ModelSerializer):
 
     def get_current_price(self, obj):
         return get_current_price(obj)
+
+
+class CreateAuctionSerializer(serializers.Serializer):
+    """
+    Usado só na criação (POST /auctions/): não é ModelSerializer porque
+    os campos de entrada não batem 1:1 com o model — quem calcula
+    starting_price/time_starting/time_ending é o service create_auction(),
+    não o cliente.
+    """
+    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
+    pricing_mode = serializers.ChoiceField(choices=Auction._meta.get_field('pricing_mode').choices)
+    duration_minutes = serializers.IntegerField(min_value=1)
+    manual_price = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
+    min_increment = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default=1)
+
+    def validate(self, data):
+        if data['pricing_mode'] == PricingMode.MANUAL and 'manual_price' not in data:
+            raise serializers.ValidationError(
+                {"manual_price": "Obrigatório quando pricing_mode = 'manual'."}
+            )
+        return data
 
 
 class BidSerializer(serializers.ModelSerializer):

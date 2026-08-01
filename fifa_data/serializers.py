@@ -1,3 +1,4 @@
+import base64
 from rest_framework import serializers
 from .models import Player, Club, League, Country, Position, Gender, LeagueType, PlayerPlayStyle, PlayerPlayStylePlus, PlayerPrime, PlayerRole, PlayerRoleAssignment, PlayerSpeciality, PlayerTeam, PlayStyle, PlayStylePlus, Speciality, Stadium, TraitType, FocusType, AccelerationType
 
@@ -12,7 +13,16 @@ class PlayerSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_photo_data_uri(self, obj):
-        return obj.photo_base64 or obj.photo_url
+        if not obj.photo:
+            return obj.photo_url
+
+        obj.photo.open("rb")
+        try:
+            encoded = base64.b64encode(obj.photo.read()).decode("ascii")
+        finally:
+            obj.photo.close()
+
+        return f"data:image/png;base64,{encoded}"
 
 class ClubSerializer(serializers.ModelSerializer):
     class Meta:
