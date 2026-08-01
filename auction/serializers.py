@@ -1,15 +1,19 @@
 from rest_framework import serializers
 from products.models import Product
+from products.serializers import ProductSerializer
 from .models import Auction, Bid, PricingMode
 from .services import get_current_price
 
 class AuctionSerializer(serializers.ModelSerializer):
     current_price = serializers.SerializerMethodField()
+    product = ProductSerializer(read_only=True)
+    starting_price = serializers.DecimalField(max_digits=12, decimal_places=2, coerce_to_string=False)
+    min_increment = serializers.DecimalField(max_digits=12, decimal_places=2, coerce_to_string=False)
 
     class Meta:
         model = Auction
         fields = '__all__'
-        read_only_fields = ['status', 'winner', 'number_of_bids', 'payment_deadline', 'starting_price']
+        read_only_fields = ['status', 'winner', 'number_of_bids', 'payment_deadline']
 
     def get_current_price(self, obj):
         return get_current_price(obj)

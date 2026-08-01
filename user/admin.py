@@ -47,5 +47,38 @@ class UserAdmin(DjangoUserAdmin):
     search_fields = ['username', 'email', 'cpf']
     actions = list(DjangoUserAdmin.actions or []) + [conceder_creditos]
 
+    fieldsets = DjangoUserAdmin.fieldsets + (
+        ('Dados pessoais', {
+            'fields': (
+                'cpf',
+                'cellphone',
+                'address',
+                'town',
+                'post_code',
+                'country',
+                'birth_date',
+            ),
+        }),
+    )
+
+    add_fieldsets = DjangoUserAdmin.add_fieldsets + (
+        ('Dados pessoais', {
+            'classes': ('wide',),
+            'fields': (
+                'username',
+                'email',
+                'cpf',
+                'cellphone',
+                'address',
+                'town',
+                'post_code',
+                'country',
+                'birth_date',
+                'password1',
+                'password2',
+            ),
+        }),
+    )
+
 
 admin.site.register(Watchlist)

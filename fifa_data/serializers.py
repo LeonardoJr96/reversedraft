@@ -13,17 +13,21 @@ class PlayerSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_photo_data_uri(self, obj):
-        if getattr(obj, "photo", None):
-            obj.photo.open("rb")
-            try:
-                encoded = base64.b64encode(obj.photo.read()).decode("ascii")
-            finally:
-                obj.photo.close()
-            return f"data:image/png;base64,{encoded}"
+        """
+        Prioridade:
+          1. Arquivo salvo localmente → retorna URL /media/player_photos/...
+          2. Base64 embutido            → retorna data:image/png;base64,...
+          3. Link externo (CDN SoFIFA)  → retorna photo_url como fallback
+        """
+        # 1. Arquivo local (backfill_player_photos já baixou)
+        if getattr(obj, "photo", None) and hasattr(obj.photo, "url"):
+            return obj.photo.url
 
+        # 2. Base64 armazenado no campo legado
         if getattr(obj, "photo_base64", None):
             return f"data:image/png;base64,{obj.photo_base64}"
 
+        # 3. Link externo como último recurso
         return obj.photo_url or ""
 
 class ClubSerializer(serializers.ModelSerializer):
