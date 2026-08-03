@@ -1,9 +1,11 @@
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from django.core.exceptions import ValidationError as DjangoValidationError
 
 from .models import Competition, Match
 from .serializers import CompetitionSerializer, MatchSerializer
 from rest_framework.views import APIView
+from campaigns import services as campaign_services
 from rest_framework.response import Response
 from rest_framework import status
 from . import services as competition_services
@@ -38,10 +40,23 @@ class MatchListView(generics.ListCreateAPIView):
         home_team = Team.objects.get(pk=home_team_id)
         away_team = Team.objects.get(pk=away_team_id)
 
-        match = Match.objects.create(competition_id=request.data.get('competition'), home_team=home_team, away_team=away_team)
+        competition = None
+        if request.data.get('competition'):
+            competition = Competition.objects.get(pk=request.data.get('competition'))
+
+        if competition is not None and getattr(competition, 'campaign', None) is not None:
+            try:
+                campaign_services._require_admin(request.user, competition.campaign)
+            except DjangoValidationError as exc:
+                return Response({'detail': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+
+        match = Match.objects.create(competition=competition, home_team=home_team, away_team=away_team)
 
         if home_score is not None and away_score is not None:
-            match = competition_services.register_manual_result(match, int(home_score), int(away_score), stats=request.data.get('stats'))
+            try:
+                match = competition_services.register_manual_result(match, int(home_score), int(away_score), stats=request.data.get('stats'))
+            except DjangoValidationError as exc:
+                return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(MatchSerializer(match).data, status=status.HTTP_201_CREATED)
 
@@ -51,5 +66,15 @@ class SimulateMatchView(APIView):
 
     def post(self, request, pk):
         match = get_object_or_404(Match, pk=pk)
-        match = competition_services.simulate_match(match)
+        if match.competition and getattr(match.competition, 'campaign', None) is not None:
+            try:
+                campaign_services._require_admin(request.user, match.competition.campaign)
+            except DjangoValidationError as exc:
+                return Response({'detail': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            match = competition_services.simulate_match(match)
+        except DjangoValidationError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
         return Response(MatchSerializer(match).data, status=status.HTTP_200_OK)

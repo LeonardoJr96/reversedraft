@@ -11,6 +11,7 @@ class Campaign(models.Model):
     name = models.CharField(max_length=255)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_campaigns')
     # business rules
     min_roster_size = models.PositiveIntegerField(default=18)
     max_roster_size = models.PositiveIntegerField(default=22)
@@ -63,6 +64,7 @@ class MarketListing(models.Model):
     market_window = models.ForeignKey(MarketWindow, on_delete=models.CASCADE, related_name='listings')
     player = models.ForeignKey('fifa_data.Player', on_delete=models.CASCADE, related_name='campaign_listings')
     seller = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='campaign_listings')
+    auction = models.ForeignKey('auction.Auction', on_delete=models.SET_NULL, null=True, blank=True, related_name='campaign_listings')
     listing_type = models.CharField(max_length=20, choices=LISTING_TYPE_CHOICES, default='auction')
     price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     is_active = models.BooleanField(default=True)

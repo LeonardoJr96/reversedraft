@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 
@@ -17,13 +18,15 @@ class CampaignServicesTests(TestCase):
         self.buyer.balance = 100
         self.buyer.save()
 
-        self.campaign = Campaign.objects.create(name='TestCamp')
+        self.campaign = Campaign.objects.create(name='TestCamp', min_roster_size=1, max_roster_size=20)
 
     def test_buy_direct_moves_roster_and_transfers_balance(self):
         # create player and seller roster
         player = Player.objects.create(fifa_id=1001, common_name='P1', overall_rating=70, price=30)
+        extra_player = Player.objects.create(fifa_id=1002, common_name='P2', overall_rating=71, price=32)
         seller_team = get_or_create_team(self.seller, self.campaign)
         seller_team.roster_entries.create(player=player)
+        seller_team.roster_entries.create(player=extra_player)
 
         # open market and list player
         window = campaign_services.create_market_window(self.campaign, 'W', starts_at=timezone.now())
@@ -75,6 +78,9 @@ class CampaignServicesTests(TestCase):
         t1.roster_entries.create(player=p1)
         t2.roster_entries.create(player=p2)
 
+        self.campaign.transfer_policy = 'always_allowed'
+        self.campaign.save(update_fields=['transfer_policy'])
+
         transfer = campaign_services.propose_transfer(self.campaign, user1, user2, offered_players=[p1.id], requested_players=[p2.id])
         transfer = campaign_services.respond_transfer(transfer, True, user2)
 
@@ -83,3 +89,29 @@ class CampaignServicesTests(TestCase):
         self.assertTrue(t2.roster_entries.filter(player=p1).exists())
         self.assertFalse(t1.roster_entries.filter(player=p1).exists())
         self.assertFalse(t2.roster_entries.filter(player=p2).exists())
+
+    def test_open_market_window_creates_auction_for_auction_listings(self):
+        player = Player.objects.create(fifa_id=4001, common_name='P1', overall_rating=70, price=50)
+        extra_player = Player.objects.create(fifa_id=4002, common_name='P2', overall_rating=72, price=55)
+        team = get_or_create_team(self.seller, self.campaign)
+        team.roster_entries.create(player=player)
+        team.roster_entries.create(player=extra_player)
+
+        window = campaign_services.create_market_window(self.campaign, 'Auction Window', starts_at=timezone.now(), player_count=1, random_selection=False)
+        campaign_services.open_market_window(window)
+        listing = campaign_services.list_player_for_sale(self.seller, self.campaign, player, listing_type='auction', price=50)
+
+        opened = campaign_services.open_market_window(window)
+        listing.refresh_from_db()
+
+        self.assertTrue(opened.is_open)
+        self.assertIsNotNone(listing.auction)
+
+    def test_create_campaign_auto_registers_creator_as_admin(self):
+        user = User.objects.create_user(username='creator', email='creator@example.com', password='x', cpf='333', cellphone='', address='', town='', post_code='', country='', birth_date='1990-01-01')
+
+        campaign = campaign_services.create_campaign(user, 'My Campaign')
+
+        self.assertEqual(campaign.created_by, user)
+        self.assertTrue(campaign.admins.filter(user=user).exists())
+        self.assertTrue(campaign.memberships.filter(user=user).exists())

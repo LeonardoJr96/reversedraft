@@ -9,9 +9,13 @@ from team.models import RosterEntry
 
 
 def register_manual_result(match, home_score, away_score, stats=None):
+    if match.home_score != 0 or match.away_score != 0 or getattr(match, 'status', None) == 'played':
+        raise ValidationError('Este confronto já possui resultado registrado.')
+
     match.home_score = home_score
     match.away_score = away_score
-    match.save(update_fields=['home_score', 'away_score'])
+    match.status = 'played'
+    match.save(update_fields=['home_score', 'away_score', 'status'])
 
     if stats:
         for stat in stats:

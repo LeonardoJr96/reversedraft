@@ -1,5 +1,5 @@
 from rest_framework import generics
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -7,6 +7,7 @@ from rest_framework import status
 from .models import Campaign, MarketWindow, MarketListing, Transfer
 from .serializers import CampaignSerializer, MarketWindowSerializer, MarketListingSerializer, TransferSerializer
 from . import services as campaign_services
+from user.models import User
 from team.serializers import TeamSerializer
 from django.shortcuts import get_object_or_404
 
@@ -17,8 +18,43 @@ class CampaignListView(generics.ListCreateAPIView):
 
     def get_permissions(self):
         if self.request.method == 'POST':
-            return [IsAdminUser()]
+            return [IsAuthenticated()]
         return [IsAuthenticated()]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        campaign = campaign_services.create_campaign(request.user, serializer.validated_data['name'])
+        headers = self.get_success_headers(serializer.data)
+        output = CampaignSerializer(campaign, context=self.get_serializer_context()).data
+        return Response(output, status=status.HTTP_201_CREATED, headers=headers)
+
+
+class CampaignAdminView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, campaign_pk):
+        campaign = get_object_or_404(Campaign, pk=campaign_pk)
+        user_id = request.data.get('user_id')
+        target = get_object_or_404(User, pk=user_id)
+        campaign_services.add_campaign_admin(request.user, campaign, target)
+        return Response({'detail': 'admin adicionado'}, status=status.HTTP_200_OK)
+
+    def delete(self, request, campaign_pk):
+        campaign = get_object_or_404(Campaign, pk=campaign_pk)
+        user_id = request.query_params.get('user_id')
+        target = get_object_or_404(User, pk=user_id)
+        campaign_services.remove_campaign_admin(request.user, campaign, target)
+        return Response({'detail': 'admin removido'}, status=status.HTTP_200_OK)
+
+
+class CampaignJoinView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, campaign_pk):
+        campaign = get_object_or_404(Campaign, pk=campaign_pk)
+        campaign_services.join_campaign(request.user, campaign)
+        return Response({'detail': 'entrada registrada'}, status=status.HTTP_200_OK)
 
 
 class MarketWindowListView(generics.ListCreateAPIView):

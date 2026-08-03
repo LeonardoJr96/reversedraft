@@ -22,9 +22,15 @@ class CompetitionEntry(models.Model):
 
 
 class Match(models.Model):
+    STATUS_CHOICES = [
+        ('scheduled', 'Agendado'),
+        ('played', 'Jogado'),
+    ]
+
     competition = models.ForeignKey(Competition, on_delete=models.CASCADE, related_name='matches')
     home_team = models.ForeignKey('team.Team', on_delete=models.CASCADE, related_name='home_matches', null=True, blank=True)
     away_team = models.ForeignKey('team.Team', on_delete=models.CASCADE, related_name='away_matches', null=True, blank=True)
     home_score = models.IntegerField(default=0)
     away_score = models.IntegerField(default=0)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='scheduled')
     played_at = models.DateTimeField(auto_now_add=True)

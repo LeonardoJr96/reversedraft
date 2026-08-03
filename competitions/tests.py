@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 
@@ -10,9 +11,29 @@ from campaigns.models import Campaign, MarketWindow
 
 
 class CompetitionsSimulationTests(TestCase):
+    def test_register_manual_result_twice_raises(self):
+        campaign = Campaign.objects.create(name='C2', matches_per_market_cycle=1, min_roster_size=1, max_roster_size=20)
+        u1 = User.objects.create_user(username='c1', email='c1@x.com', password='x', cpf='z3', cellphone='', address='', town='', post_code='', country='', birth_date='1990-01-01')
+        u2 = User.objects.create_user(username='c2', email='c2@x.com', password='x', cpf='z4', cellphone='', address='', town='', post_code='', country='', birth_date='1990-01-01')
+
+        t1 = get_or_create_team(u1, campaign)
+        t2 = get_or_create_team(u2, campaign)
+        p1 = Player.objects.create(fifa_id=5001, common_name='P1', overall_rating=80)
+        p2 = Player.objects.create(fifa_id=5002, common_name='P2', overall_rating=70)
+        t1.roster_entries.create(player=p1)
+        t2.roster_entries.create(player=p2)
+
+        comp = Competition.objects.create(name='Comp', competition_type='league', campaign=campaign)
+        match = Match.objects.create(competition=comp, home_team=t1, away_team=t2, played_at=timezone.now())
+
+        competition_services.register_manual_result(match, 1, 0)
+
+        with self.assertRaises(ValidationError):
+            competition_services.register_manual_result(match, 2, 1)
+
     def test_simulate_match_and_open_market(self):
         # create campaign with small cycle
-        campaign = Campaign.objects.create(name='C1', matches_per_market_cycle=1)
+        campaign = Campaign.objects.create(name='C1', matches_per_market_cycle=1, min_roster_size=1, max_roster_size=20)
 
         # create two users and teams with players
         u1 = User.objects.create_user(username='a', email='a@x.com', password='x', cpf='z1', cellphone='', address='', town='', post_code='', country='', birth_date='1990-01-01')

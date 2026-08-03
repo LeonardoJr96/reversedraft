@@ -3,7 +3,11 @@ from django.db import transaction
 from django.utils import timezone
 from datetime import timedelta
 
+from django.contrib.auth import get_user_model
+
+from auction.services import create_auction
 from fifa_data.models import Player
+from products.models import Product
 from team.models import Team
 from team.services import get_or_create_team
 from .models import Campaign, CampaignAdmin, CampaignMembership, MarketListing, MarketWindow, Transfer
@@ -30,8 +34,56 @@ def roster_size(team):
     return team.roster_entries.count()
 
 
+def create_campaign(user, name, **kwargs):
+    with transaction.atomic():
+        campaign = Campaign.objects.create(created_by=user, name=name, **kwargs)
+        CampaignAdmin.objects.get_or_create(campaign=campaign, user=user)
+        CampaignMembership.objects.get_or_create(campaign=campaign, user=user)
+        return campaign
+
+
+def add_campaign_admin(actor, campaign, target_user):
+    _require_admin(actor, campaign)
+    if target_user.pk == actor.pk:
+        raise ValidationError('O criador já é administrador.')
+    CampaignAdmin.objects.get_or_create(campaign=campaign, user=target_user)
+    CampaignMembership.objects.get_or_create(campaign=campaign, user=target_user)
+    return campaign
+
+
+def remove_campaign_admin(actor, campaign, target_user):
+    _require_admin(actor, campaign)
+    CampaignAdmin.objects.filter(campaign=campaign, user=target_user).delete()
+    return campaign
+
+
+def join_campaign(user, campaign):
+    CampaignMembership.objects.get_or_create(campaign=campaign, user=user)
+    return campaign
+
+
+def _validate_roster_limits(team, campaign, expected_delta=0):
+    current_size = team.roster_entries.count() + expected_delta
+    if current_size < campaign.min_roster_size:
+        raise ValidationError(f'O elenco não pode ficar abaixo de {campaign.min_roster_size} jogadores.')
+    if current_size > campaign.max_roster_size:
+        raise ValidationError(f'O elenco não pode ultrapassar {campaign.max_roster_size} jogadores.')
+
+
+def _transfers_allowed_now(campaign):
+    if campaign.transfer_policy == 'always_allowed':
+        return True
+    if campaign.transfer_policy == 'market_window_only':
+        return MarketWindow.objects.filter(campaign=campaign, is_open=True).exists()
+    return False
+
+
 def release_player(user, campaign, player):
     team = get_or_create_campaign_team(user, campaign)
+    if team.roster_entries.filter(player=player).count() == 0:
+        raise ValidationError('Este jogador não está no seu elenco da campanha.')
+    if team.roster_entries.count() - 1 < campaign.min_roster_size:
+        raise ValidationError(f'Você não pode dispensar este jogador porque o elenco já está no limite mínimo de {campaign.min_roster_size}.')
     team.roster_entries.filter(player=player).delete()
     return team
 
@@ -40,6 +92,9 @@ def list_player_for_sale(user, campaign, player, listing_type='auction', price=N
     team = get_or_create_campaign_team(user, campaign)
     if not team.roster_entries.filter(player=player).exists():
         raise ValidationError('Este jogador não está no seu elenco da campanha.')
+
+    if team.roster_entries.count() - 1 < campaign.min_roster_size:
+        raise ValidationError(f'Você não pode colocar este jogador à venda porque o elenco já está no limite mínimo de {campaign.min_roster_size}.')
 
     window = MarketWindow.objects.filter(campaign=campaign, is_open=True).order_by('-pk').first()
     if window is None:
@@ -130,9 +185,25 @@ def populate_market_window(window):
 
 
 def open_market_window(window):
-    window.is_open = True
-    window.save(update_fields=['is_open'])
-    return window
+    with transaction.atomic():
+        window = MarketWindow.objects.select_for_update().get(pk=window.pk)
+        window.is_open = True
+        window.save(update_fields=['is_open'])
+
+        for listing in MarketListing.objects.filter(market_window=window, is_active=True, listing_type__in=['auction', 'hybrid'], auction__isnull=True):
+            product, _ = Product.objects.get_or_create(
+                player=listing.player,
+                defaults={
+                    'title': listing.player.common_name or listing.player.fifa_id,
+                    'description': f'Jogador do mercado da campanha {window.campaign.name}',
+                    'price': listing.player.price or 0,
+                },
+            )
+            auction = create_auction(product=product, pricing_mode='player_value', duration_minutes=60, manual_price=None)
+            listing.auction = auction
+            listing.save(update_fields=['auction'])
+
+        return window
 
 
 def close_market_window(window):
@@ -211,6 +282,10 @@ def buy_direct(user, campaign, player, price):
         if not seller_team.roster_entries.filter(player=player).exists():
             raise ValidationError('Vendedor não possui este jogador no elenco da campanha.')
 
+        buyer_team = get_or_create_campaign_team(buyer, campaign)
+        _validate_roster_limits(buyer_team, campaign, expected_delta=1)
+        _validate_roster_limits(seller_team, campaign, expected_delta=-1)
+
         # efetiva transferências de saldo
         buyer.balance -= charge
         buyer.save(update_fields=['balance'])
@@ -230,7 +305,6 @@ def buy_direct(user, campaign, player, price):
         )
 
         # move roster entry do vendedor para o comprador
-        buyer_team = get_or_create_campaign_team(buyer, campaign)
         # remove do vendedor
         seller_team.roster_entries.filter(player=player).delete()
         # adiciona ao comprador
@@ -248,6 +322,9 @@ def propose_transfer(campaign, requester, receiver, offered_players=None, reques
     e solicita `requested_players` do `receiver`.
     Os argumentos podem ser listas de `Player` instances ou de ids.
     """
+    if not _transfers_allowed_now(campaign):
+        raise ValidationError('As transferências não estão permitidas neste momento para esta campanha.')
+
     transfer = Transfer.objects.create(
         campaign=campaign,
         requester=requester,
@@ -276,6 +353,9 @@ def respond_transfer(transfer, accepted, responder):
         return transfer
 
     # accepted path
+    if not _transfers_allowed_now(transfer.campaign):
+        raise ValidationError('As transferências não estão permitidas neste momento para esta campanha.')
+
     offered = list(transfer.offered_players.all())
     requested = list(transfer.requested_players.all())
 
@@ -299,6 +379,13 @@ def respond_transfer(transfer, accepted, responder):
 
         if missing:
             raise ValidationError('Um ou mais jogadores não estão disponíveis nos elencos correspondentes.')
+
+        requester_size_after = requester_team.roster_entries.count() - len(offered) + len(requested)
+        receiver_size_after = receiver_team.roster_entries.count() - len(requested) + len(offered)
+        if requester_size_after < transfer.campaign.min_roster_size or requester_size_after > transfer.campaign.max_roster_size:
+            raise ValidationError('A troca deixaria um dos elencos fora do limite permitido.')
+        if receiver_size_after < transfer.campaign.min_roster_size or receiver_size_after > transfer.campaign.max_roster_size:
+            raise ValidationError('A troca deixaria um dos elencos fora do limite permitido.')
 
         # perform transfers: offered -> receiver; requested -> requester
         for p in offered:
