@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
+from decimal import Decimal
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
@@ -34,12 +35,45 @@ def roster_size(team):
     return team.roster_entries.count()
 
 
+def _grant_starting_balance(user, campaign, membership):
+    amount = campaign.starting_balance or Decimal("0")
+    if amount <= 0 or membership.starting_balance > 0:
+        return
+    locked_user = user.__class__.objects.select_for_update().get(pk=user.pk)
+    locked_user.balance += amount
+    locked_user.save(update_fields=["balance"])
+    membership.starting_balance = amount
+    membership.save(update_fields=["starting_balance"])
+
+
 def create_campaign(user, name, **kwargs):
     with transaction.atomic():
         campaign = Campaign.objects.create(created_by=user, name=name, **kwargs)
         CampaignAdmin.objects.get_or_create(campaign=campaign, user=user)
-        CampaignMembership.objects.get_or_create(campaign=campaign, user=user)
+        membership, _ = CampaignMembership.objects.get_or_create(campaign=campaign, user=user, defaults={"starting_balance": 0})
+        _grant_starting_balance(user, campaign, membership)
         return campaign
+
+
+def configure_starting_balance(actor, campaign, amount):
+    _require_admin(actor, campaign)
+    amount = Decimal(str(amount))
+    if amount < 0:
+        raise ValidationError("O saldo inicial não pode ser negativo.")
+    with transaction.atomic():
+        previous = campaign.starting_balance or Decimal("0")
+        campaign.starting_balance = amount
+        campaign.save(update_fields=["starting_balance"])
+        if amount > previous:
+            for membership in campaign.memberships.select_related("user").select_for_update():
+                delta = amount - membership.starting_balance
+                if delta > 0:
+                    locked_user = membership.user.__class__.objects.select_for_update().get(pk=membership.user_id)
+                    locked_user.balance += delta
+                    locked_user.save(update_fields=["balance"])
+                    membership.starting_balance = amount
+                    membership.save(update_fields=["starting_balance"])
+    return campaign
 
 
 def add_campaign_admin(actor, campaign, target_user):
@@ -47,7 +81,10 @@ def add_campaign_admin(actor, campaign, target_user):
     if target_user.pk == actor.pk:
         raise ValidationError('O criador já é administrador.')
     CampaignAdmin.objects.get_or_create(campaign=campaign, user=target_user)
-    CampaignMembership.objects.get_or_create(campaign=campaign, user=target_user)
+    membership, created = CampaignMembership.objects.get_or_create(campaign=campaign, user=target_user, defaults={"starting_balance": 0})
+    if created:
+        with transaction.atomic():
+            _grant_starting_balance(target_user, campaign, membership)
     return campaign
 
 
@@ -58,7 +95,10 @@ def remove_campaign_admin(actor, campaign, target_user):
 
 
 def join_campaign(user, campaign):
-    CampaignMembership.objects.get_or_create(campaign=campaign, user=user)
+    membership, created = CampaignMembership.objects.get_or_create(campaign=campaign, user=user, defaults={"starting_balance": 0})
+    if created:
+        with transaction.atomic():
+            _grant_starting_balance(user, campaign, membership)
     return campaign
 
 

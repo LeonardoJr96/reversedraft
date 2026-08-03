@@ -24,7 +24,10 @@ class CampaignListView(generics.ListCreateAPIView):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        campaign = campaign_services.create_campaign(request.user, serializer.validated_data['name'])
+        data = dict(serializer.validated_data)
+        name = data.pop('name')
+        allowed = {key: data[key] for key in ('starting_balance', 'min_roster_size', 'max_roster_size', 'matches_per_market_cycle', 'transfer_policy') if key in data}
+        campaign = campaign_services.create_campaign(request.user, name, **allowed)
         headers = self.get_success_headers(serializer.data)
         output = CampaignSerializer(campaign, context=self.get_serializer_context()).data
         return Response(output, status=status.HTTP_201_CREATED, headers=headers)
@@ -47,6 +50,23 @@ class CampaignAdminView(APIView):
         campaign_services.remove_campaign_admin(request.user, campaign, target)
         return Response({'detail': 'admin removido'}, status=status.HTTP_200_OK)
 
+
+class CampaignSettingsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, campaign_pk):
+        campaign = get_object_or_404(Campaign, pk=campaign_pk)
+        if "starting_balance" not in request.data:
+            return Response({"detail": "starting_balance is required"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            campaign = campaign_services.configure_starting_balance(request.user, campaign, request.data["starting_balance"])
+        except Exception as exc:
+            from django.core.exceptions import ValidationError
+            if isinstance(exc, ValidationError):
+                code = status.HTTP_403_FORBIDDEN if "administrador" in str(exc) else status.HTTP_400_BAD_REQUEST
+                return Response({"detail": str(exc)}, status=code)
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(CampaignSerializer(campaign).data)
 
 class CampaignJoinView(APIView):
     permission_classes = [IsAuthenticated]

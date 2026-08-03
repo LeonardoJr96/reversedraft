@@ -6,6 +6,7 @@ urlpatterns = [
     path('campaigns/', views.CampaignListView.as_view(), name='campaign-list'),
     path('campaigns/<int:campaign_pk>/admins/', views.CampaignAdminView.as_view(), name='campaign-admins'),
     path('campaigns/<int:campaign_pk>/join/', views.CampaignJoinView.as_view(), name='campaign-join'),
+    path('campaigns/<int:campaign_pk>/settings/', views.CampaignSettingsView.as_view(), name='campaign-settings'),
     path('campaigns/market-windows/', views.MarketWindowListView.as_view(), name='market-window-list'),
     path('campaigns/listings/', views.MarketListingListView.as_view(), name='market-listing-list'),
     path('campaigns/listings/<int:pk>/', views.MarketListingDetailView.as_view(), name='market-listing-detail'),

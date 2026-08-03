@@ -18,6 +18,7 @@ class Campaign(models.Model):
     matches_per_market_cycle = models.PositiveIntegerField(default=3)
     matches_played_since_last_market = models.PositiveIntegerField(default=0)
     transfer_policy = models.CharField(max_length=32, choices=TransferPolicy.choices, default=TransferPolicy.MARKET_WINDOW_ONLY)
+    starting_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
 
 class CampaignAdmin(models.Model):
@@ -32,6 +33,7 @@ class CampaignMembership(models.Model):
     campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name='memberships')
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='campaign_memberships')
     joined_at = models.DateTimeField(auto_now_add=True)
+    starting_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
     class Meta:
         unique_together = ('campaign', 'user')

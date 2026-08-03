@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from dj_rql.drf import RQLFilterBackend
 from rest_framework import viewsets
+from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
@@ -12,127 +13,132 @@ from .filters import PlayerFilter, ClubFilter, LeagueFilter, CountryFilter, Posi
 from .services import import_players_bulk
 
 
-class PlayerViewSet(viewsets.ModelViewSet):
+class AdminWriteModelViewSet(viewsets.ModelViewSet):
+    """Dados de referência são públicos para leitura; alterações exigem staff."""
+    def get_permissions(self):
+        return [AllowAny()] if self.action in {"list", "retrieve"} else [IsAdminUser()]
+
+class PlayerViewSet(AdminWriteModelViewSet):
     filter_backends = [RQLFilterBackend]
     rql_filter_class = PlayerFilter
     queryset = Player.objects.all()
     serializer_class = PlayerSerializer
 
-class ClubViewSet(viewsets.ModelViewSet):
+class ClubViewSet(AdminWriteModelViewSet):
     filter_backends = [RQLFilterBackend]
     rql_filter_class = ClubFilter
     queryset = Club.objects.all()
     serializer_class = ClubSerializer
 
-class LeagueViewSet(viewsets.ModelViewSet):
+class LeagueViewSet(AdminWriteModelViewSet):
     filter_backends = [RQLFilterBackend]
     rql_filter_class = LeagueFilter
     queryset = League.objects.all()
     serializer_class = LeagueSerializer
 
-class CountryViewSet(viewsets.ModelViewSet):
+class CountryViewSet(AdminWriteModelViewSet):
     filter_backends = [RQLFilterBackend]
     rql_filter_class = CountryFilter
     queryset = Country.objects.all()
     serializer_class = CountrySerializer
 
-class PositionViewSet(viewsets.ModelViewSet):
+class PositionViewSet(AdminWriteModelViewSet):
     filter_backends = [RQLFilterBackend]
     rql_filter_class = PositionFilter
     queryset = Position.objects.all()
     serializer_class = PositionSerializer
 
-class GenderViewSet(viewsets.ModelViewSet):
+class GenderViewSet(AdminWriteModelViewSet):
     filter_backends = [RQLFilterBackend]
     rql_filter_class = GenderFilter
     queryset = Gender.objects.all()
     serializer_class = GenderSerializer
 
-class LeagueTypeViewSet(viewsets.ModelViewSet):
+class LeagueTypeViewSet(AdminWriteModelViewSet):
     filter_backends = [RQLFilterBackend]
     rql_filter_class = LeagueTypeFilter
     queryset = LeagueType.objects.all()
     serializer_class = LeagueTypeSerializer
 
-class PlayerPlayStyleViewSet(viewsets.ModelViewSet):
+class PlayerPlayStyleViewSet(AdminWriteModelViewSet):
     filter_backends = [RQLFilterBackend]
     rql_filter_class = PlayerPlayStyleFilter
     queryset = PlayerPlayStyle.objects.all()
     serializer_class = PlayerPlayStyleSerializer
 
-class PlayerPlayStylePlusViewSet(viewsets.ModelViewSet):
+class PlayerPlayStylePlusViewSet(AdminWriteModelViewSet):
     filter_backends = [RQLFilterBackend]
     rql_filter_class = PlayerPlayStylePlusFilter
     queryset = PlayerPlayStylePlus.objects.all()
     serializer_class = PlayerPlayStylePlusSerializer
 
-class PlayerPrimeViewSet(viewsets.ModelViewSet):
+class PlayerPrimeViewSet(AdminWriteModelViewSet):
     filter_backends = [RQLFilterBackend]
     rql_filter_class = PlayerPrimeFilter
     queryset = PlayerPrime.objects.all()
     serializer_class = PlayerPrimeSerializer
 
-class PlayerRoleViewSet(viewsets.ModelViewSet):
+class PlayerRoleViewSet(AdminWriteModelViewSet):
     filter_backends = [RQLFilterBackend]
     rql_filter_class = PlayerRoleFilter
     queryset = PlayerRole.objects.all()
     serializer_class = PlayerRoleSerializer
 
-class PlayerRoleAssignmentViewSet(viewsets.ModelViewSet):
+class PlayerRoleAssignmentViewSet(AdminWriteModelViewSet):
     filter_backends = [RQLFilterBackend]
     rql_filter_class = PlayerRoleAssignmentFilter
     queryset = PlayerRoleAssignment.objects.all()
     serializer_class = PlayerRoleAssignmentSerializer
 
-class PlayerSpecialityViewSet(viewsets.ModelViewSet):
+class PlayerSpecialityViewSet(AdminWriteModelViewSet):
     filter_backends = [RQLFilterBackend]
     rql_filter_class = PlayerSpecialityFilter
     queryset = PlayerSpeciality.objects.all()
     serializer_class = PlayerSpecialitySerializer
 
-class PlayerTeamViewSet(viewsets.ModelViewSet):
+class PlayerTeamViewSet(AdminWriteModelViewSet):
     filter_backends = [RQLFilterBackend]
     rql_filter_class = PlayerTeamFilter
     queryset = PlayerTeam.objects.all()
     serializer_class = PlayerTeamSerializer
 
-class PlayStyleViewSet(viewsets.ModelViewSet):
+class PlayStyleViewSet(AdminWriteModelViewSet):
     filter_backends = [RQLFilterBackend]
     rql_filter_class = PlayStyleFilter
     queryset = PlayStyle.objects.all()
     serializer_class = PlayStyleSerializer
 
-class PlayStylePlusViewSet(viewsets.ModelViewSet):
+class PlayStylePlusViewSet(AdminWriteModelViewSet):
     filter_backends = [RQLFilterBackend]
     rql_filter_class = PlayStylePlusFilter
     queryset = PlayStylePlus.objects.all()
     serializer_class = PlayStylePlusSerializer
 
-class SpecialityViewSet(viewsets.ModelViewSet):
+class SpecialityViewSet(AdminWriteModelViewSet):
     filter_backends = [RQLFilterBackend]
     rql_filter_class = SpecialityFilter
     queryset = Speciality.objects.all()
     serializer_class = SpecialitySerializer
 
-class StadiumViewSet(viewsets.ModelViewSet):
+class StadiumViewSet(AdminWriteModelViewSet):
     filter_backends = [RQLFilterBackend]
     rql_filter_class = StadiumFilter
     queryset = Stadium.objects.all()
     serializer_class = StadiumSerializer
 
-class TraitTypeViewSet(viewsets.ModelViewSet):
+class TraitTypeViewSet(AdminWriteModelViewSet):
     filter_backends = [RQLFilterBackend]
     rql_filter_class = TraitTypeFilter
     queryset = TraitType.objects.all()
     serializer_class = TraitTypeSerializer
 
-class FocusTypeViewSet(viewsets.ModelViewSet):
+class FocusTypeViewSet(AdminWriteModelViewSet):
     filter_backends = [RQLFilterBackend]
     rql_filter_class = FocusTypeFilter
     queryset = FocusType.objects.all()
     serializer_class = FocusTypeSerializer
 
-class AccelerationTypeViewSet(viewsets.ModelViewSet):
+class AccelerationTypeViewSet(AdminWriteModelViewSet):
     filter_backends = [RQLFilterBackend]
     rql_filter_class = AccelerationTypeFilter
     queryset = AccelerationType.objects.all()

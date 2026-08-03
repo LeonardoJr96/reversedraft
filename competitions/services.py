@@ -15,6 +15,9 @@ def register_manual_result(match, home_score, away_score, stats=None):
     if match.home_score != 0 or match.away_score != 0 or getattr(match, 'status', None) == 'played':
         raise ValidationError('Este confronto já possui resultado registrado.')
 
+    if match.competition.competition_type == 'cup' and home_score == away_score:
+        raise ValidationError('Partidas de copa precisam de um vencedor; informe o resultado dos pênaltis.')
+
     match.home_score = home_score
     match.away_score = away_score
     match.status = 'played'
@@ -81,10 +84,27 @@ def _advance_winner(match):
     next_match.save(update_fields=[f'{match.next_match_slot}_team'])
 
 
+def _standings_key(entry, matches):
+    wins = goals_for = goals_against = 0
+    for match in matches:
+        if match.home_team_id == entry.team_id:
+            goals_for += match.home_score
+            goals_against += match.away_score
+            if match.home_score > match.away_score:
+                wins += 1
+        elif match.away_team_id == entry.team_id:
+            goals_for += match.away_score
+            goals_against += match.home_score
+            if match.away_score > match.home_score:
+                wins += 1
+    return (entry.points, wins, goals_for - goals_against, goals_for, -entry.id)
+
 def finish_competition(competition):
     if not competition.is_active:
         raise ValidationError('Esta competição já foi encerrada.')
-    top_entry = competition.entries.order_by('-points', 'id').first()
+    entries = list(competition.entries.all())
+    played_matches = list(competition.matches.filter(status='played'))
+    top_entry = max(entries, key=lambda entry: _standings_key(entry, played_matches), default=None)
     if top_entry is None or not competition.matches.filter(status='played').exists():
         raise ValidationError('Nenhuma equipe possui pontuação registrada.')
     if top_entry.team is None or top_entry.team.owner_id is None:
@@ -167,6 +187,9 @@ def simulate_match(match):
     # adicionar ruído e gerar gols inteiros
     home_goals = max(0, int(round(random.gauss(home_exp, 1.2))))
     away_goals = max(0, int(round(random.gauss(away_exp, 1.2))))
+
+    if match.competition.competition_type == 'cup' and home_goals == away_goals:
+        away_goals += 1
 
     # registrar resultado e disparar efeitos colaterais
     return register_manual_result(match, home_goals, away_goals, stats=None)

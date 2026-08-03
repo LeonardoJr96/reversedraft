@@ -179,4 +179,4 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
 }
 
-SCRAPER_IMPORT_KEY = "troque-por-um-valor-secreto-de-verdade"
+SCRAPER_IMPORT_KEY = os.environ.get("SCRAPER_IMPORT_KEY", "troque-por-um-valor-secreto-de-verdade")

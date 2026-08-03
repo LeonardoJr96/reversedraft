@@ -18,10 +18,18 @@ class PlayerSerializer(serializers.ModelSerializer):
           1. Arquivo salvo localmente → retorna URL /media/player_photos/...
           2. Base64 embutido            → retorna data:image/png;base64,...
           3. Link externo (CDN SoFIFA)  → retorna photo_url como fallback
-        """
-        # 1. Arquivo local (backfill_player_photos já baixou)
-        if getattr(obj, "photo", None) and hasattr(obj.photo, "url"):
-            return obj.photo.url
+        """        # 1. Arquivo local persistido; arquivos em memória são data URI.
+        photo = getattr(obj, "photo", None)
+        if photo and getattr(photo, "_committed", True) is False and hasattr(photo, "read"):
+            position = photo.tell() if hasattr(photo, "tell") else 0
+            raw = photo.read()
+            if hasattr(photo, "seek"):
+                photo.seek(position)
+            extension = str(getattr(photo, "name", "png")).rsplit(".", 1)[-1].lower()
+            mime = {"jpg": "jpeg", "jpeg": "jpeg", "webp": "webp", "gif": "gif"}.get(extension, "png")
+            return f"data:image/{mime};base64,{base64.b64encode(raw).decode('ascii')}"
+        if photo and hasattr(photo, "url"):
+            return photo.url
 
         # 2. Base64 armazenado no campo legado
         if getattr(obj, "photo_base64", None):
