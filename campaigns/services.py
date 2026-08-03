@@ -120,7 +120,7 @@ def withdraw_listing(user, campaign, listing_id):
     return listing
 
 
-def create_market_window(campaign, name, starts_at=None, ends_at=None, mode='auction', player_count=None, random_selection=True):
+def create_market_window(campaign, name, starts_at=None, ends_at=None, mode='auction', player_count=None, random_selection=True, per_player_mode=None):
     """Cria uma janela de mercado com opções de modo e curadoria.
 
     - `mode`: 'auction' | 'market' | 'hybrid'
@@ -137,17 +137,18 @@ def create_market_window(campaign, name, starts_at=None, ends_at=None, mode='auc
         random_selection=random_selection,
     )
     if player_count:
-        populate_market_window(window)
+        populate_market_window(window, per_player_mode=per_player_mode)
     return window
 
 
-def populate_market_window(window):
+def populate_market_window(window, per_player_mode=None):
     """Pre-popula a janela de mercado com `player_count` jogadores extraídos dos
     elencos da campanha. Seleção aleatória quando `random_selection=True`.
     Cria `MarketListing` com `listing_type` igual a `window.mode` (mapping).
     """
     if not window.player_count:
         return []
+    per_player_mode = per_player_mode or {}
 
     campaign = window.campaign
     # obter todos os jogadores presentes nos elencos da campanha
@@ -171,17 +172,33 @@ def populate_market_window(window):
 
     created = []
     for player, seller in selected:
+        listing_type = per_player_mode.get(player.id, per_player_mode.get(str(player.id)))
+        if listing_type is None:
+            listing_type = 'auction' if window.mode == 'auction' else 'direct' if window.mode == 'market' else 'hybrid'
+        if listing_type not in {'auction', 'direct'}:
+            raise ValidationError('Modalidade individual deve ser auction ou direct.')
         listing = MarketListing.objects.create(
             market_window=window,
             player=player,
             seller=seller,
-            listing_type='auction' if window.mode == 'auction' else 'direct' if window.mode == 'market' else 'hybrid',
+            listing_type=listing_type,
             price=player.price if player.price is not None else None,
             is_active=True,
         )
         created.append(listing)
 
     return created
+
+
+def update_listing_type(actor, listing, listing_type):
+    if listing_type not in {'auction', 'direct'}:
+        raise ValidationError('Modalidade deve ser auction ou direct.')
+    _require_admin(actor, listing.market_window.campaign)
+    if listing.auction_id is not None:
+        raise ValidationError('Não é possível alterar a modalidade após a janela ser aberta.')
+    listing.listing_type = listing_type
+    listing.save(update_fields=['listing_type'])
+    return listing
 
 
 def open_market_window(window):

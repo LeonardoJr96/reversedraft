@@ -5,6 +5,8 @@ from django.core.exceptions import ValidationError
 from django.conf import settings
 from django.utils import timezone
 from django.db import transaction
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 
 from user.models import User
 from .models import Auction, Bid, PricingMode
@@ -100,7 +102,21 @@ def place_bid(user, auction: Auction, price):
 
         auction.save()
 
+    transaction.on_commit(lambda: _broadcast_bid(bid))
     return bid
+
+
+def _broadcast_bid(bid):
+    channel_layer = get_channel_layer()
+    if channel_layer is None:
+        return
+    async_to_sync(channel_layer.group_send)(
+        f'auction_{bid.auction_id}',
+        {'type': 'bid.placed', 'payload': {
+            'type': 'bid.placed', 'auction_id': bid.auction_id,
+            'amount': str(bid.price), 'user': bid.user.username,
+        }},
+    )
 
 
 def get_bid_status(bid):

@@ -20,10 +20,12 @@ class TacticSlotSerializer(serializers.ModelSerializer):
 class TeamSerializer(serializers.ModelSerializer):
     slots = TacticSlotSerializer(many=True, read_only=True)
     formation_layout = serializers.SerializerMethodField()
+    balance = serializers.DecimalField(source='owner.balance', max_digits=12, decimal_places=2, read_only=True)
+    player_count = serializers.IntegerField(source='roster_entries.count', read_only=True)
 
     class Meta:
         model = Team
-        fields = ["id", "name", "formation", "slots", "formation_layout", "updated_at"]
+        fields = ["id", "name", "formation", "balance", "player_count", "slots", "formation_layout", "updated_at"]
 
     def get_formation_layout(self, obj):
         layout = FormationSlot.objects.filter(formation=obj.formation)

@@ -41,6 +41,7 @@ urlpatterns = [
     path('api/v1/payments/', include('payment.urls')),
     path('api/v1/', include('campaigns.urls')),
     path('api/v1/', include('competitions.urls')),
+    path('api/v1/', include('social.urls')),
 
     path('login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('login/refresh/', TokenRefreshView.as_view(), name='token_refresh'),

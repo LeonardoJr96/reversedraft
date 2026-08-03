@@ -8,6 +8,7 @@ urlpatterns = [
     path('campaigns/<int:campaign_pk>/join/', views.CampaignJoinView.as_view(), name='campaign-join'),
     path('campaigns/market-windows/', views.MarketWindowListView.as_view(), name='market-window-list'),
     path('campaigns/listings/', views.MarketListingListView.as_view(), name='market-listing-list'),
+    path('campaigns/listings/<int:pk>/', views.MarketListingDetailView.as_view(), name='market-listing-detail'),
     path('campaigns/transfers/', views.TransferListView.as_view(), name='transfer-list'),
     path('campaigns/<int:campaign_pk>/list-player-for-sale/', views.ListPlayerForSaleView.as_view(), name='campaign-list-player-for-sale'),
     path('campaigns/<int:campaign_pk>/buy-direct/', views.BuyDirectView.as_view(), name='campaign-buy-direct'),

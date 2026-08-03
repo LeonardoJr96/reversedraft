@@ -69,6 +69,7 @@ class MarketWindowListView(generics.ListCreateAPIView):
         mode = request.data.get('mode', 'auction')
         player_count = request.data.get('player_count')
         random_selection = request.data.get('random_selection', True)
+        per_player_mode = request.data.get('per_player_mode')
 
         if not campaign_id or not name:
             return Response({'detail': 'campaign and name are required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -77,7 +78,7 @@ class MarketWindowListView(generics.ListCreateAPIView):
         # require admin
         campaign_services._require_admin(request.user, campaign)
 
-        window = campaign_services.create_market_window(campaign, name, starts_at=starts_at, ends_at=ends_at, mode=mode, player_count=player_count, random_selection=random_selection)
+        window = campaign_services.create_market_window(campaign, name, starts_at=starts_at, ends_at=ends_at, mode=mode, player_count=player_count, random_selection=random_selection, per_player_mode=per_player_mode)
         return Response(MarketWindowSerializer(window).data, status=status.HTTP_201_CREATED)
 
 
@@ -182,12 +183,13 @@ class MarketWindowCreateView(APIView):
         mode = request.data.get('mode', 'auction')
         player_count = request.data.get('player_count')
         random_selection = request.data.get('random_selection', True)
+        per_player_mode = request.data.get('per_player_mode')
 
         campaign = get_object_or_404(Campaign, pk=campaign_pk)
         # require admin
         campaign_services._require_admin(request.user, campaign)
 
-        window = campaign_services.create_market_window(campaign, name, starts_at=starts_at, ends_at=ends_at, mode=mode, player_count=player_count, random_selection=random_selection)
+        window = campaign_services.create_market_window(campaign, name, starts_at=starts_at, ends_at=ends_at, mode=mode, player_count=player_count, random_selection=random_selection, per_player_mode=per_player_mode)
         return Response(MarketWindowSerializer(window).data, status=status.HTTP_201_CREATED)
 
 
@@ -206,3 +208,20 @@ class MarketWindowOpenCloseView(APIView):
             return Response({'detail': 'invalid action'}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(MarketWindowSerializer(window).data)
+
+
+class MarketListingDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        listing = get_object_or_404(MarketListing, pk=pk)
+        try:
+            campaign_services._require_admin(request.user, listing.market_window.campaign)
+            listing = campaign_services.update_listing_type(request.user, listing, request.data.get('listing_type'))
+        except Exception as exc:
+            from django.core.exceptions import ValidationError
+            if isinstance(exc, ValidationError):
+                code = status.HTTP_403_FORBIDDEN if 'administrador' in str(exc) else status.HTTP_400_BAD_REQUEST
+                return Response({'detail': str(exc)}, status=code)
+            raise
+        return Response(MarketListingSerializer(listing).data)

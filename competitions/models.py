@@ -9,6 +9,8 @@ class Competition(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     # link to campaign so competitions can trigger market windows
     campaign = models.ForeignKey('campaigns.Campaign', on_delete=models.CASCADE, null=True, blank=True, related_name='competitions')
+    credits_per_win = models.PositiveIntegerField(default=1)
+    credits_per_title = models.PositiveIntegerField(default=5)
 
 
 class CompetitionEntry(models.Model):
@@ -34,3 +36,6 @@ class Match(models.Model):
     away_score = models.IntegerField(default=0)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='scheduled')
     played_at = models.DateTimeField(auto_now_add=True)
+    round_number = models.PositiveIntegerField(null=True, blank=True)
+    next_match = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='feeder_matches')
+    next_match_slot = models.CharField(max_length=10, choices=[('home', 'Home'), ('away', 'Away')], null=True, blank=True)

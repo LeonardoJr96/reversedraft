@@ -3,7 +3,7 @@ from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from django.core.exceptions import ValidationError as DjangoValidationError
 
 from .models import Competition, Match
-from .serializers import CompetitionSerializer, MatchSerializer
+from .serializers import BracketMatchSerializer, CompetitionSerializer, MatchSerializer
 from rest_framework.views import APIView
 from campaigns import services as campaign_services
 from rest_framework.response import Response
@@ -54,7 +54,17 @@ class MatchListView(generics.ListCreateAPIView):
 
         if home_score is not None and away_score is not None:
             try:
-                match = competition_services.register_manual_result(match, int(home_score), int(away_score), stats=request.data.get('stats'))
+                stats = []
+                for stat in request.data.get('stats') or []:
+                    from fifa_data.models import Player
+                    from team.models import Team
+                    stats.append({
+                        'player': Player.objects.get(pk=stat['player']),
+                        'team': Team.objects.get(pk=stat['team']),
+                        'goals': stat.get('goals', 0),
+                        'assists': stat.get('assists', 0),
+                    })
+                match = competition_services.register_manual_result(match, int(home_score), int(away_score), stats=stats)
             except DjangoValidationError as exc:
                 return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -78,3 +88,50 @@ class SimulateMatchView(APIView):
             return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(MatchSerializer(match).data, status=status.HTTP_200_OK)
+
+
+class FinishCompetitionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        competition = get_object_or_404(Competition, pk=pk)
+        try:
+            if competition.campaign_id:
+                campaign_services._require_admin(request.user, competition.campaign)
+            elif not request.user.is_staff:
+                return Response({'detail': 'Apenas administradores podem encerrar esta competição.'}, status=status.HTTP_403_FORBIDDEN)
+            return Response(competition_services.finish_competition(competition))
+        except DjangoValidationError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class GenerateBracketView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        competition = get_object_or_404(Competition, pk=pk)
+        try:
+            if competition.campaign_id:
+                campaign_services._require_admin(request.user, competition.campaign)
+            elif not request.user.is_staff:
+                return Response({'detail': 'Apenas administradores podem gerar o chaveamento.'}, status=status.HTTP_403_FORBIDDEN)
+            from team.models import Team
+            teams = list(Team.objects.filter(pk__in=request.data.get('team_ids', [])))
+            if len(teams) != len(request.data.get('team_ids', [])):
+                return Response({'detail': 'Um ou mais times não foram encontrados.'}, status=status.HTTP_400_BAD_REQUEST)
+            matches = competition_services.generate_bracket(competition, teams)
+            return Response({'matches': BracketMatchSerializer(matches, many=True).data}, status=status.HTTP_201_CREATED)
+        except DjangoValidationError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class BracketView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        competition = get_object_or_404(Competition, pk=pk)
+        rounds = []
+        for round_number in competition.matches.exclude(round_number__isnull=True).values_list('round_number', flat=True).distinct().order_by('round_number'):
+            matches = competition.matches.filter(round_number=round_number).select_related('home_team', 'away_team', 'next_match')
+            rounds.append({'round_number': round_number, 'matches': BracketMatchSerializer(matches, many=True).data})
+        return Response({'rounds': rounds})

@@ -84,6 +84,7 @@ class Transfer(models.Model):
 class MatchPlayerStat(models.Model):
     match = models.ForeignKey('competitions.Match', on_delete=models.CASCADE, related_name='player_stats')
     player = models.ForeignKey('fifa_data.Player', on_delete=models.CASCADE, related_name='match_stats')
+    team = models.ForeignKey('team.Team', on_delete=models.CASCADE, related_name='match_stats', null=True, blank=True)
     goals = models.IntegerField(default=0)
     assists = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
